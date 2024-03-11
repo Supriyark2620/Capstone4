@@ -1,0 +1,51 @@
+{
+  "StartAt": "TriggerLambda",
+  "States": {
+    "TriggerLambda": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:730335466863:function:functiontriggerglue",
+      "Next": "Glue StartJobRun"
+    },
+    "Glue StartJobRun": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Parameters": {
+        "JobName": "Final"
+      },
+      "Next": "Choice"
+    },
+    "Choice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.JobRunState",
+          "StringEquals": "SUCCEEDED",
+          "Next": "SNS Publish_success"
+        },
+        {
+          "Variable": "$.JobRunState",
+          "StringEquals": "FAILED",
+          "Next": "SNS Publish_failure"
+        }
+      ]
+    },
+    "SNS Publish_success": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "arn:aws:sns:us-east-1:730335466863:success_sns",
+        "Message": "Pipeline Successfull"
+      },
+      "End": true
+    },
+    "SNS Publish_failure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "arn:aws:sns:us-east-1:730335466863:failure_sns",
+        "Message": "Pipeline failed"
+      },
+      "End": true
+    }
+  }
+}
