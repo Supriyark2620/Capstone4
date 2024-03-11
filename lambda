@@ -1,0 +1,34 @@
+import boto3
+import time
+
+def lambda_handler(event, context):
+    # Check if the event contains 'Records' key
+    if 'Records' in event:
+        # Iterate over each record in the event
+        for record in event['Records']:
+            # Extract the S3 bucket and object key from the event record
+            s3_bucket = record['s3']['bucket']['name']
+            s3_key = record['s3']['object']['key']
+
+            # Print the bucket and object key for logging/debugging
+            print('S3 Bucket:', s3_bucket)
+            print('S3 Object Key:', s3_key)
+            glue_client = boto3.client('glue')
+            glue_job_name = 'Final'
+            response = glue_client.start_job_run(JobName=glue_job_name, 
+                                                 Arguments={'--s3_bucket': s3_bucket, '--s3_key': s3_key})
+            print('Glue job started successfully:', response)
+            return {
+                'statusCode': 200,
+                'body': {
+                    'GlueJobRunId': response['JobRunId']
+                }
+            }
+    
+    else:
+        print("Event does not contain 'Records' key")
+
+    return {
+        'statusCode': 200,
+        'body': 'No S3 upload event detected.'
+    }
