@@ -1,0 +1,50 @@
+from pyspark.context import SparkContext
+from awsglue.context import GlueContext
+from pyspark.sql import SparkSession
+from pyspark.sql.types import *
+
+sc = SparkContext()
+glueContext = GlueContext(sc)
+spark = glueContext.spark_session
+schema = StructType([
+    StructField("Order ID", StringType(), True),
+    StructField("Customer ID", StringType(), True),
+    StructField("Product ID", StringType(), True),
+    StructField("Order Date", StringType(), True)
+])
+
+schema1 = StructType([
+    StructField("Order ID", StringType(), True),
+    StructField("Return Reason", StringType(), True),
+    StructField("Return Date", StringType(), True),
+])
+
+# Read data from the two tables in S3
+
+# table1_df=spark.read.format("csv").option("mode", "dropmalformed").option("header", "true").schema(schema).load("s3://capstone12/Order/Order.csv")
+# table2_df=spark.read.format("csv").option("mode", "dropmalformed").option("header", "true").schema(schema).load("s3://capstone12/Return/Return.csv")
+table1_df = spark.read.csv("s3://capstone12/Order.csv",header=True, schema=schema)
+table2_df = spark.read.csv("s3://capstone12/Return.csv",header=True, schema=schema1)
+orderdf = table1_df.withColumnRenamed("Order ID", "order_id")\
+          .withColumnRenamed("Customer ID", "customer_id")\
+          .withColumnRenamed("Product ID", "product_id")\
+          .withColumnRenamed("Order Date", "order_date")
+
+returndf = table2_df.withColumnRenamed("Order ID", "order_id")\
+        .withColumnRenamed("Return Reason", "return_reason")\
+        .withColumnRenamed("Return Date", "return_date")
+
+# Perform the join operation
+joined_df = orderdf.join(returndf,on ="order_id", how="full")
+
+# Write the joined data to Redshift serverless database
+joined_df.write \
+    .format("jdbc") \
+    .option("url", "jdbc:redshift://test.730335466863.us-east-1.redshift-serverless.amazonaws.com:5439/dev") \
+    .option("dbtable", "public.order_returns_new") \
+    .option("user", "admin") \
+    .option("password", "Astor2620") \
+    .option("aws_iam_role", "arn:aws:iam::730335466863:role/AWSRole") \
+    .option("redshiftTmpDir", "s3://athena/temporary/") \
+    .mode("overwrite") \
+    .save()
